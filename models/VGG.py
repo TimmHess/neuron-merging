@@ -10,7 +10,8 @@ import torch.nn.functional as F
 __all__ = ['VGG']
 
 defaultcfg = {
-    11: [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512],
+    11: [32, 'M', 64, 'M', 128, 128, 'M', 256, 256, 'M', 256, 256],
+    #11: [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512],
     13: [64, 64, 'M', 128, 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512],
     16: [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512],
     19: [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256, 'M', 512, 512, 512, 512, 'M', 512, 512, 512, 512],
@@ -18,14 +19,15 @@ defaultcfg = {
 
 
 class VGG(nn.Module):
-    def __init__(self, out_classes=10, depth=16, init_weights=True, cfg=None):
+    def __init__(self, out_classes=10, depth=11, init_weights=True, cfg=None):
         super(VGG, self).__init__()
         if cfg is None:
             cfg = defaultcfg[depth]
 
         self.cfg = cfg
 
-        self.feature = self.make_layers(cfg, True)
+        #self.feature = self.make_layers(cfg, True)
+        self.feature = self.make_layers(cfg, False)
 
         self.classifier = nn.Sequential(
             nn.Linear(cfg[-1], 512),
@@ -109,4 +111,5 @@ class VGG(nn.Module):
 
         return y.cpu().detach().numpy()
 
-        
+    def get_cfg(self):
+        return self.cfg

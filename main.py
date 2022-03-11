@@ -19,7 +19,8 @@ sys.path.append(cwd+'/../')
 import models
 from torchvision import datasets, transforms
 from torch.autograd import Variable
-from decompose import Decompose
+from lib.decompose import Decompose
+from lib.neuron_merger import NeuronMerger
 
 def save_state(model, acc):
     print('==> Saving model ...')
@@ -97,6 +98,7 @@ def train(epoch):
                 100. * batch_idx / len(train_loader), loss.data))
     return
 
+
 def test(epoch, evaluate=False):
     global best_acc
     global best_epoch
@@ -129,7 +131,6 @@ def test(epoch, evaluate=False):
 
 
 def adjust_learning_rate(optimizer, epoch, gammas, schedule):
-    
     lr = args.lr
     for (gamma, step) in zip (gammas, schedule):
         if(epoch>= step) and (args.epochs * 3 //4 >= epoch):
@@ -146,7 +147,6 @@ def adjust_learning_rate(optimizer, epoch, gammas, schedule):
 
 
 def weight_init(model, decomposed_weight_list, target):
-
     for layer in model.state_dict():
         decomposed_weight = decomposed_weight_list.pop(0)
         model.state_dict()[layer].copy_(decomposed_weight)
@@ -203,6 +203,8 @@ if __name__=='__main__':
             help='schedule : (default: [100,200])')
     parser.add_argument('--depth-wide', action='store', default=None,
             help='depth and wide (default: None)')
+    parser.add_argument('--no_bn', action='store_true', default=False,
+            help='drops batch-norm term in neuron merging function') # TODO: make this agnistic to whether ther actually is a batch-norm term
 
     args = parser.parse_args()
     
@@ -298,10 +300,16 @@ if __name__=='__main__':
         if args.target == 'conv' :
             if args.arch == 'VGG':
                 if args.dataset == 'cifar10':
-                    cfg = [32, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 256, 256, 256, 'M', 256, 256, 256]
+                    #cfg = [32, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 256, 256, 256, 'M', 256, 256, 256]
+                    cfg = [32, 'M', 64, 'M', 128, 128, 'M', 256, 256, 'M', 256, 256]
                 elif args.dataset == 'cifar100':
                     cfg = [32, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 256, 'M', 256, 256, 256]
+
+                for i in range(len(cfg)):
+                    if(type(cfg[i])==int and i > 3):
+                       cfg[i] = int(cfg[i] * (1 - args.pruning_ratio)) 
                 temp_cfg = list(filter(('M').__ne__, cfg))
+                print("VGG cfg: ", temp_cfg)
 
             elif args.arch == 'ResNet':
                 cfg = [16, 32, 64]
@@ -327,20 +335,10 @@ if __name__=='__main__':
 
 
     # generate the model
-    if args.arch == 'VGG':
-        model = models.VGG(num_classes, cfg=cfg)
-    elif args.arch == 'LeNet_300_100':
-        model = models.LeNet_300_100(bias_flag=True, cfg=cfg)
-    elif args.arch == 'ResNet':
-        model = models.ResNet(int(args.depth_wide) ,num_classes,cfg=cfg)
-    elif args.arch == 'WideResNet':
-        model = models.WideResNet(args.depth_wide[0], num_classes, widen_factor=args.depth_wide[1], cfg=cfg)
-    else:
-        pass
-
+    model = models.generate_model(args.arch, cfg, num_classes, args)
+    
     if args.cuda:
         model.cuda()
-
 
     # pretrain
     best_acc = 0.0
@@ -353,9 +351,11 @@ if __name__=='__main__':
             model.load_state_dict(pretrained_model['state_dict'])
 
 
+
     # weight initialization
     if args.retrain:
-        decomposed_list = Decompose(args.arch, pretrained_model['state_dict'], args.criterion, args.threshold, args.lamda, args.model_type, temp_cfg, args.cuda).main()
+        decomposed_list = Decompose(args.arch, pretrained_model['state_dict'], args.criterion, args.threshold, 
+                            args.lamda, args.model_type, temp_cfg, args.cuda, args.no_bn).main()
         model = weight_init(model, decomposed_list, args.target)
 
 
@@ -372,6 +372,14 @@ if __name__=='__main__':
     if args.evaluate:
         test(0, evaluate=True)
         exit()
+
+
+    # DEBUG
+    if(args.arch == "VGG"):
+        neuronMerger = NeuronMerger(model.cfg, expand_percentage=0.2, args=args)
+        neuronMerger.expand(model)
+    print("done...")
+    sys.exit()
 
     for epoch in range(1, args.epochs + 1):
         adjust_learning_rate(optimizer, epoch, args.gammas, args.schedule)

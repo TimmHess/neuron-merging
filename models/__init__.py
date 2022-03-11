@@ -3,6 +3,7 @@ from .VGG       import *
 from .ResNet    		import *
 from .WideResNet		import *
 
+import copy
 
 def generate_model(arch_name:str, cfg, num_classes, args):
     model = None
@@ -21,10 +22,18 @@ def generate_model(arch_name:str, cfg, num_classes, args):
 
 
 def adjust_configuration(cfg, adjustment_percentage):
-    for i in range(len(cfg)):
-        if(type(cfg[i])==int): # and i > 3
-            cfg[i] = int(cfg[i] * adjustment_percentage)
+    tmp_cfg = copy.deepcopy(cfg)
+    for i in range(len(tmp_cfg)):
+        if(type(tmp_cfg[i])==int): # and i > 3
+            tmp_cfg[i] = int(tmp_cfg[i] * adjustment_percentage)
     #print("cfg: ", cfg)
     #temp_cfg = list(filter(('M').__ne__, cfg))
     #print("temp_cfg:", temp_cfg)
-    return cfg
+    return tmp_cfg
+
+
+def weight_init(model, decomposed_weight_list):
+    for layer in model.state_dict():
+        decomposed_weight = decomposed_weight_list.pop(0)
+        model.state_dict()[layer].copy_(decomposed_weight)
+    return model

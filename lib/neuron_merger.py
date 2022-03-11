@@ -16,7 +16,7 @@ class NeuronMerger():
 
     def copy_weights(self, model_a, model_b):
         """
-        Copies weights from modelA to modelB.
+        Copies weights from model_a to model_b.
         """
         state_dict_a = model_a.state_dict()
         state_dict_b = model_b.state_dict()
@@ -34,6 +34,17 @@ class NeuronMerger():
                 state_dict_b[layer] = state_dict_a[layer]
         return
 
+    def copy_weights_and_init(self, model_a, model_b):
+        """
+        Applies weight initialization and copies weights from model_a to model_b where possible
+        """
+        state_dict_b = model_b.state_dict()
+        for _, layer in enumerate(state_dict_b):
+            if(len(state_dict_b) == 4):
+                torch.nn.init.xavier_uniform_(state_dict_b[layer])
+        
+        self.copy_weights(model_a, model_b)
+        return
 
     def expand(self, model:nn.Sequential):
         """
@@ -49,7 +60,7 @@ class NeuronMerger():
         if(self.args.cuda):
             expanded_model.cuda()
         # Copy model weights 
-        self.copy_weights(model, expanded_model)
+        self.copy_weights_and_init(model, expanded_model)
         return expanded_model
 
 

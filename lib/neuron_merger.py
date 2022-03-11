@@ -12,6 +12,8 @@ class NeuronMerger():
         self.expand_percentage = expand_percentage
         self.args = args
         self.base_cfg = None
+
+        self.base_weight_shapes = [] # storing the non-expanded model's weight dimension
         return
 
     def copy_weights(self, model_a, model_b):
@@ -23,7 +25,7 @@ class NeuronMerger():
 
         for index, layer in enumerate(state_dict_a):
             layer_shape_a = state_dict_a[layer].size()
-            #print("layer:", layer, "len shape:", len(layer_shape_a))
+            print("layer:", layer, "len shape:", len(layer_shape_a))
             if(len(layer_shape_a) == 4):
                 state_dict_b[layer] = state_dict_a[layer][:, :layer_shape_a[1], :, :]
             elif(len(layer_shape_a) == 2):
@@ -33,6 +35,7 @@ class NeuronMerger():
             elif(len(layer_shape_a) == 0):
                 state_dict_b[layer] = state_dict_a[layer]
         return
+
 
     def copy_weights_and_init(self, model_a, model_b):
         """
@@ -45,6 +48,7 @@ class NeuronMerger():
         
         self.copy_weights(model_a, model_b)
         return
+
 
     def expand(self, model:nn.Sequential):
         """
@@ -82,3 +86,20 @@ class NeuronMerger():
         compressed_model = models.weight_init(compressed_model, decomposed_weights)
         return compressed_model
 
+
+    def store_weight_shapes(self, model:nn.Sequential):
+        weight_shapes = {}
+
+        model_state_dict = model.state_dict()
+
+        for _, layer in enumerate(model.state_dict()):
+            #weight_shapes[layer] = 
+            continue
+        return weight_shapes
+
+
+
+    def freeze_old_weights(self, model:nn.Sequential):
+        
+        
+        return

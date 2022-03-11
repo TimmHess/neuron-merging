@@ -22,6 +22,8 @@ from torch.autograd import Variable
 from lib.decompose import Decompose
 from lib.neuron_merger import NeuronMerger
 
+from cmd_parser import parser
+
 def save_state(model, acc):
     print('==> Saving model ...')
     state = {
@@ -142,73 +144,11 @@ def adjust_learning_rate(optimizer, epoch, gammas, schedule):
     print('learning rate : ', lr)
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
-
     return
 
 
-def weight_init(model, decomposed_weight_list, target):
-    for layer in model.state_dict():
-        decomposed_weight = decomposed_weight_list.pop(0)
-        model.state_dict()[layer].copy_(decomposed_weight)
-        
-    return model
-
-
 if __name__=='__main__':
-    # settings
-    parser = argparse.ArgumentParser(description='Neuron Merging Example')
-    parser.add_argument('--batch-size', type=int, default=128, metavar='N',
-            help='input batch size for training (default: 128)')
-    parser.add_argument('--test-batch-size', type=int, default=256, metavar='N',
-            help='input batch size for testing (default: 256)')
-    parser.add_argument('--epochs', type=int, default=200, metavar='N',
-            help='number of epochs to train (default: 200)')
-    parser.add_argument('--lr', type=float, default=0.1, metavar='LR',
-            help='learning rate (default: 0.1)')
-    parser.add_argument('--momentum', type=float, default=0.9, metavar='M',
-            help='SGD momentum (default: 0.9)')
-    parser.add_argument('--weight-decay', '--wd', default=5e-4, type=float,
-            metavar='W', help='weight decay (default: 5e-4)')
-    parser.add_argument('--no-cuda', action='store_true', default=False,
-            help='disables CUDA training')
-    parser.add_argument('--seed', type=int, default=1, metavar='S',
-            help='random seed (default: 1)')
-    parser.add_argument('--log-interval', type=int, default=100, metavar='N',
-            help='how many batches to wait before logging training status')
-    parser.add_argument('--arch', action='store', default='VGG',
-            help='network structure: VGG | ResNet | WideResNet | LeNet_300_100')
-    parser.add_argument('--pretrained', action='store', default=None,
-            help='pretrained model')
-    parser.add_argument('--evaluate', action='store_true', default=False,
-            help='whether to run evaluation')
-    parser.add_argument('--retrain', action='store_true', default=False,
-            help='whether to retrain')
-    parser.add_argument('--model-type', action='store', default='original',
-            help='model type: original | prune | merge')
-    parser.add_argument('--target', action='store', default='conv',
-            help='decomposing target: default=None | conv | ip')
-    parser.add_argument('--dataset', action='store', default='cifar10',
-            help='dataset: cifar10 | cifar100 | FashionMNIST')
-    parser.add_argument('--criterion', action='store', default='l1-norm',
-            help='criterion : l1-norm | l2-norm | l2-GM')
-    parser.add_argument('--threshold', type=float, default=1,
-            help='threshold (default: 1)')
-    parser.add_argument('--lamda', type=float, default=0.8,
-            help='lamda (default: 0.8)')
-    parser.add_argument('--pruning-ratio', type=float, default=0.7,
-            help='pruning ratio : (default: 0.7)')
-    parser.add_argument('--gammas', type=float, nargs='+', default=[0.1,0.1],
-            help='gammas : (default: [0.1,0.1])')
-    parser.add_argument('--schedule', type=int, nargs='+', default=[100,200],
-            help='schedule : (default: [100,200])')
-    parser.add_argument('--depth-wide', action='store', default=None,
-            help='depth and wide (default: None)')
-    parser.add_argument('--no_bn', action='store_true', default=False,
-            help='drops batch-norm term in neuron merging function') # TODO: make this agnistic to whether ther actually is a batch-norm term
-
     args = parser.parse_args()
-    
-
     # check options
     if not (args.model_type in [None, 'original', 'merge', 'prune']):
         print('ERROR: Please choose the correct model type')
@@ -220,18 +160,17 @@ if __name__=='__main__':
         print('ERROR: specified arch is not suppported')
         exit()
     
-
-    torch.manual_seed(args.seed)
+    if(not(args.seed == -1)):
+        torch.manual_seed(args.seed)
 
     args.cuda = not args.no_cuda and torch.cuda.is_available()
-
     if args.cuda:
-        torch.cuda.manual_seed(args.seed)
-        torch.backends.cudnn.deterministic=True
-
+        if(not(args.seed == -1)):
+            torch.cuda.manual_seed(args.seed)
+            torch.backends.cudnn.deterministic=True
 
     # load data
-    num_classes = 10
+    num_classes = args.num_classes
 
     if args.dataset == 'cifar10':
         transform_train = transforms.Compose([
@@ -356,7 +295,7 @@ if __name__=='__main__':
     if args.retrain:
         decomposed_list = Decompose(args.arch, pretrained_model['state_dict'], args.criterion, args.threshold, 
                             args.lamda, args.model_type, temp_cfg, args.cuda, args.no_bn).main()
-        model = weight_init(model, decomposed_list, args.target)
+        model = models.weight_init(model, decomposed_list)
 
 
     # print the number of model parameters
@@ -376,10 +315,19 @@ if __name__=='__main__':
 
     # DEBUG
     if(args.arch == "VGG"):
-        neuronMerger = NeuronMerger(model.cfg, expand_percentage=0.2, args=args)
-        neuronMerger.expand(model)
+        neuronMerger = NeuronMerger(expand_percentage=0.2, args=args)
+        print("NeuronMerger Initialized...")
+        print(model)
+        model = neuronMerger.expand(model)
+        print("Model got expanded...")
+        #print(model)
+        #sys.exit()
+        model = neuronMerger.compress(model)
+        print("Model got compressed...")
+        #print(model)
     print("done...")
     sys.exit()
+    # END DEBUG
 
     for epoch in range(1, args.epochs + 1):
         adjust_learning_rate(optimizer, epoch, args.gammas, args.schedule)

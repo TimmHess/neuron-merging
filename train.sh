@@ -20,3 +20,8 @@
 #python3 main_cl_mnist.py --arch SimpleCNN --dataset MNIST --batch-size 32 --log-interval 500 --retrain --pretrained saved_models/SimpleCNN.MNIST.original.pth.tar --threshold 1.0 --criterion l1-norm --lr 0.01 --seed 42 --pruning-ratio 1 --epochs 3
 
 ##########################################
+# PreTrain SimpleCNN 
+python3 main_cl.py --arch SimpleCNN --dataset DecrasingLighting --batch-size 32 --epochs 10 --model-type original --pruning-ratio 0.0 --lr 0.001 --log-interval 200 --num_classes 5
+
+# 
+python3 main_cl.py --arch SimpleCNN --dataset DecrasingLighting --batch-size 32 --epochs 10 --model-type original --pruning-ratio 0.0 --lr 0.001 --log-interval 200 --num_classes 5

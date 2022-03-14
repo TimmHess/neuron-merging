@@ -20,7 +20,6 @@ sys.path.append(cwd+'/../')
 import models
 
 """
-
 counter = 0
 for i, exp in enumerate(train_stream):
     dataset, t = exp.dataset, exp.task_label
@@ -39,6 +38,49 @@ for i, exp in enumerate(train_stream):
         break
 """
 
+
+def train_one_epoch(epoch, train_loader):
+    for batch_idx, batch in enumerate(train_loader):
+        data, target, _ = batch
+        if args.cuda:
+            data, target = data.cuda(), target.cuda()
+        optimizer.zero_grad()
+        output = model(data)
+        loss = criterion(output, target)
+        loss.backward()
+
+        # NeuronMerger freeze
+        #neuronMerger.freeze_old_weights(model)
+
+        optimizer.step()
+        if batch_idx % args.log_interval == 0:
+            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                epoch, batch_idx * len(data), len(train_loader.dataset),
+                100. * batch_idx / len(train_loader), loss.data))
+
+def test(epoch, test_loader):
+    model.eval()
+    test_loss = 0
+    correct = 0
+    with torch.no_grad():
+        for batch_idx, batch in enumerate(test_loader):
+            data, target, _ = batch
+            if args.cuda:
+                data, target = data.cuda(), target.cuda()
+            
+            output = model(data)
+            test_loss += criterion(output, target).data
+            pred = output.data.max(1, keepdim=True)[1]
+            correct += pred.eq(target.data.view_as(pred)).cpu().sum()
+
+        acc = 100. * float(correct) / len(test_loader.dataset)
+
+        test_loss /= len(test_loader.dataset)
+        print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)'.format(
+            test_loss * args.batch_size, correct, len(test_loader.dataset),
+            100. * float(correct) / len(test_loader.dataset)))
+
+
 # Get Args
 args = parser.parse_args()
 
@@ -51,28 +93,14 @@ if args.cuda:
         torch.cuda.manual_seed(args.seed)
         torch.backends.cudnn.deterministic=True
 
-# Create Dataset - Create CL Benchmark
-transform = transforms.Compose([ transforms.ToTensor()])
-scenario = EndlessCLSim(
-    scenario="Illumination",
-    sequence_order=None,
-    task_order=None,
-    dataset_root="./data/"
-)
-train_stream = scenario.train_stream
-test_stream = scenario.test_stream
-
-kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
-#train_loader = torch.utils.data.DataLoader(train_data, batch_size=args.batch_size, shuffle=True, **kwargs)
-#test_loader = torch.utils.data.DataLoader(test_data, batch_size=args.test_batch_size, shuffle=False, **kwargs)
-
 # Create Model
-model = models.generate_model(args.arch, num_classes=args.num_classes, args=args, cfg=None)
+cfg = [16, "M", 32, "M", 64, "M", 64, "M"]
+model = models.generate_model(args.arch, num_classes=args.num_classes, args=args, cfg=cfg)
 print(model)
 if args.cuda:
     model.cuda()
 
-# pretrain
+# Load Pretrained Weights
 if args.pretrained:
     pretrained_model = torch.load(args.pretrained)
     model.load_state_dict(pretrained_model['state_dict'])
@@ -90,72 +118,33 @@ if(args.retrain):
 optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 criterion = nn.CrossEntropyLoss()
 
-# Train Loop
-model.train()
-for epoch in range (args.epochs):
-    for batch_idx, (data, target) in enumerate(train_loader):
-        if args.cuda:
-            data, target = data.cuda(), target.cuda()
-        data, target = Variable(data), Variable(target)
-        optimizer.zero_grad()
-        output = model(data)
-        loss = criterion(output, target)
-        loss.backward()
+# Create Dataset - Create CL Benchmark
+transform = transforms.Compose([transforms.ToTensor()])
+scenario = EndlessCLSim(
+    scenario="Illumination",
+    sequence_order=[0],
+    task_order=None,
+    dataset_root="./data/",
+    train_transform=transform,
+    eval_transform=transform
+)
+train_stream = scenario.train_stream
+test_stream = scenario.test_stream
+kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
 
-        # NeuronMerger freeze
-        #neuronMerger.freeze_old_weights(model)
-
-        optimizer.step()
-        if batch_idx % args.log_interval == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                epoch, batch_idx * len(data), len(train_loader.dataset),
-                100. * batch_idx / len(train_loader), loss.data))
+print("Train stream:", len(train_stream))
 
 
-# Test Loop
-model.eval()
-test_loss = 0
-correct = 0
-with torch.no_grad():
-    for data, target in test_loader:
-        if args.cuda:
-            data, target = data.cuda(), target.cuda()
-        #data, target = Variable(data, volatile=True), Variable(target)
-        output = model(data)
-        test_loss += criterion(output, target).data
-        pred = output.data.max(1, keepdim=True)[1]
-        correct += pred.eq(target.data.view_as(pred)).cpu().sum()
+for i, exp in enumerate(train_stream):
+    dataset, t = exp.dataset, exp.task_label
+    train_loader = DataLoader(dataset, batch_size=32, shuffle=True, **kwargs)
+    
+    for epoch in range (args.epochs):
+        train_one_epoch(epoch, train_loader)
 
-    acc = 100. * float(correct) / len(test_loader.dataset)
-
-    test_loss /= len(test_loader.dataset)
-    print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)'.format(
-        test_loss * args.batch_size, correct, len(test_loader.dataset),
-        100. * float(correct) / len(test_loader.dataset)))
-
-
-# Compress model back to original size
-model = neuronMerger.compress(model)
-#model = neuronMerger.compress_deterministic(model)
-print(model)
+    # Store model
+    if not args.retrain:
+        models.save_state(model, -1.0, args)
 
 # Test Loop
-model.eval()
-test_loss = 0
-correct = 0
-with torch.no_grad():
-    for data, target in test_loader:
-        if args.cuda:
-            data, target = data.cuda(), target.cuda()
-        #data, target = Variable(data, volatile=True), Variable(target)
-        output = model(data)
-        test_loss += criterion(output, target).data
-        pred = output.data.max(1, keepdim=True)[1]
-        correct += pred.eq(target.data.view_as(pred)).cpu().sum()
 
-    acc = 100. * float(correct) / len(test_loader.dataset)
-
-    test_loss /= len(test_loader.dataset)
-    print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)'.format(
-        test_loss * args.batch_size, correct, len(test_loader.dataset),
-        100. * float(correct) / len(test_loader.dataset)))

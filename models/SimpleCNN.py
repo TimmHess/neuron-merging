@@ -19,8 +19,8 @@ class SimpleCNN(nn.Module):
         self.feature = self.make_layers(cfg)
         
         self.classifier = nn.Sequential(
-            nn.Conv2d(cfg[-2], out_channels=out_classes, kernel_size=3, padding=0, stride=1, bias=True)
-            #nn.Linear(cfg[-2]*3*3, out_classes)
+            #nn.Conv2d(cfg[-2], out_channels=out_classes, kernel_size=3, padding=0, stride=1, bias=True) #MNIST
+            nn.Conv2d(cfg[-2], out_channels=out_classes, kernel_size=4, padding=0, stride=1, bias=True) #DecreasingLight
         )
 
         self._initialize_weights_kaiming()
@@ -44,7 +44,6 @@ class SimpleCNN(nn.Module):
         #x = nn.AvgPool2d(2)(x)
         #print("features:", x.size())
         #x = x.view(x.size(0), -1)
-        
         y = self.classifier(x)
         y = y.view(y.size(0),-1)
         return y

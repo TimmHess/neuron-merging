@@ -7,7 +7,7 @@ from .SimpleCNN         import *
 import copy
 
 
-def save_state(model, acc):
+def save_state(model, acc, args):
     print('==> Saving model ...')
     state = {
             'acc': acc,
@@ -63,7 +63,10 @@ def save_state(model, acc):
                                     str(args.pruning_ratio),
                                     'pth.tar'])
 
+    save_path = os.path.join('saved_models/', model_filename)
     torch.save(state, os.path.join('saved_models/', model_filename))
+    print("Model saved at", save_path)
+    return
 
 
 def generate_model(arch_name:str, cfg, num_classes, args):

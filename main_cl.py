@@ -20,15 +20,7 @@ sys.path.append(cwd+'/../')
 import models
 
 """
-# Create CL Benchmark
-scenario = EndlessCLSim(
-    scenario="Illumination",
-    sequence_order=None,
-    task_order=None,
-    dataset_root="./data/"
-)
-train_stream = scenario.train_stream
-test_stream = scenario.test_stream
+
 counter = 0
 for i, exp in enumerate(train_stream):
     dataset, t = exp.dataset, exp.task_label
@@ -59,19 +51,23 @@ if args.cuda:
         torch.cuda.manual_seed(args.seed)
         torch.backends.cudnn.deterministic=True
 
-# Create Dataset
-transform = transforms.Compose([ transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,)) ])
-train_data = datasets.MNIST('data', train=True, download=True, transform=transform)
-test_data = datasets.MNIST('data', train=False, download=True, transform=transform)
+# Create Dataset - Create CL Benchmark
+transform = transforms.Compose([ transforms.ToTensor()])
+scenario = EndlessCLSim(
+    scenario="Illumination",
+    sequence_order=None,
+    task_order=None,
+    dataset_root="./data/"
+)
+train_stream = scenario.train_stream
+test_stream = scenario.test_stream
 
 kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
-train_loader = torch.utils.data.DataLoader(train_data, batch_size=args.batch_size, shuffle=True, **kwargs)
-test_loader = torch.utils.data.DataLoader(test_data, batch_size=args.test_batch_size, shuffle=False, **kwargs)
-
-num_classes = 10
+#train_loader = torch.utils.data.DataLoader(train_data, batch_size=args.batch_size, shuffle=True, **kwargs)
+#test_loader = torch.utils.data.DataLoader(test_data, batch_size=args.test_batch_size, shuffle=False, **kwargs)
 
 # Create Model
-model = models.generate_model(args.arch, num_classes=num_classes, args=args, cfg=None)
+model = models.generate_model(args.arch, num_classes=args.num_classes, args=args, cfg=None)
 print(model)
 if args.cuda:
     model.cuda()

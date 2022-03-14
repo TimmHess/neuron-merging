@@ -7,12 +7,14 @@ __all__ = ['SimpleCNN']
 defaultcfg = [8, "M", 16, "M", 32, "M"]
 
 class SimpleCNN(nn.Module):
-    def __init__(self, out_classes=10, init_weights=True, cfg=None):
+    def __init__(self, out_classes=10, init_weights=True, cfg=None, in_channel=3):
         super(SimpleCNN, self).__init__()
+        
+        self.cfg = cfg
         if cfg is None:
             cfg = defaultcfg
 
-        self.cfg = cfg
+        self.in_channel = in_channel
 
         self.feature = self.make_layers(cfg)
         
@@ -26,7 +28,7 @@ class SimpleCNN(nn.Module):
         
     def make_layers(self, cfg):
         layers = []
-        in_channels = 1
+        in_channels = self.in_channel
         for v in cfg:
             if v == 'M':
                 layers += [nn.MaxPool2d(kernel_size=2, stride=2)]

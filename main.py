@@ -249,9 +249,9 @@ if __name__=='__main__':
     if args.retrain:
         if args.target == 'conv' :
             if args.arch == 'SimpleCNN':
-                cfg = [8, "M", 16, "M", 32]
+                cfg = [8, "M", 16, "M", 32, "M"]
                 for i in range(len(cfg)):
-                    if(type(cfg[i]) == int):
+                    if(type(cfg[i]) == int) and i > 2:
                         cfg[i] = int(cfg[i] * (1 - args.pruning_ratio)) 
                 temp_cfg = list(filter(('M').__ne__, cfg))
                 print("SimpleCNN cfg: ", temp_cfg)

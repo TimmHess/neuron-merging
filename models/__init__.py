@@ -6,6 +6,66 @@ from .SimpleCNN         import *
 
 import copy
 
+
+def save_state(model, acc):
+    print('==> Saving model ...')
+    state = {
+            'acc': acc,
+            'state_dict': model.state_dict(),
+            }
+    for key in state['state_dict'].keys():
+        if 'module' in key:
+            print(key)
+            state['state_dict'][key.replace('module.', '')] = \
+                    state['state_dict'].pop(key)
+                    
+    # save
+    if args.model_type == 'original':
+        if args.arch == 'WideResNet' :
+            model_filename = '.'.join([args.arch,
+                                    args.dataset,
+                                    args.model_type,
+                                    '_'.join(map(str, args.depth_wide)),
+                                    'pth.tar'])
+        elif args.arch == 'ResNet' :
+            model_filename = '.'.join([args.arch,
+                                    args.dataset,
+                                    args.model_type,
+                                    str(args.depth_wide),
+                                    'pth.tar'])
+        else:
+            model_filename = '.'.join([args.arch,
+                                        args.dataset,
+                                        args.model_type,
+                                        'pth.tar'])
+    else: # retrain
+        if args.arch == 'WideResNet' :
+            model_filename = '.'.join([args.arch,
+                                    '_'.join(map(str, args.depth_wide)),
+                                    args.dataset,
+                                    args.model_type,
+                                    args.criterion,
+                                    str(args.pruning_ratio),
+                                    'pth.tar'])
+        elif args.arch == 'ResNet' :
+            model_filename = '.'.join([args.arch,
+                                    str(args.depth_wide),
+                                    args.dataset,
+                                    args.model_type,
+                                    args.criterion,
+                                    str(args.pruning_ratio),
+                                    'pth.tar'])
+        else :
+            model_filename = '.'.join([args.arch,
+                                    args.dataset,
+                                    args.model_type,
+                                    args.criterion,
+                                    str(args.pruning_ratio),
+                                    'pth.tar'])
+
+    torch.save(state, os.path.join('saved_models/', model_filename))
+
+
 def generate_model(arch_name:str, cfg, num_classes, args):
     model = None
     if args.arch == 'VGG':
@@ -27,7 +87,7 @@ def generate_model(arch_name:str, cfg, num_classes, args):
 def adjust_configuration(cfg, adjustment_percentage):
     tmp_cfg = copy.deepcopy(cfg)
     for i in range(len(tmp_cfg)):
-        if(type(tmp_cfg[i])==int): # and i > 3
+        if(type(tmp_cfg[i])==int):
             tmp_cfg[i] = int(tmp_cfg[i] * adjustment_percentage)
     #print("cfg: ", cfg)
     #temp_cfg = list(filter(('M').__ne__, cfg))

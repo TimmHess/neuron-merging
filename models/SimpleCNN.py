@@ -1,9 +1,10 @@
+from audioop import bias
 import torch.nn as nn
 import torch.nn.functional as F
 
 __all__ = ['SimpleCNN']
 
-defaultcfg = [8, "M", 16, "M", 32]
+defaultcfg = [8, "M", 16, "M", 32, "M"]
 
 class SimpleCNN(nn.Module):
     def __init__(self, out_classes=10, init_weights=True, cfg=None):
@@ -16,9 +17,8 @@ class SimpleCNN(nn.Module):
         self.feature = self.make_layers(cfg)
         
         self.classifier = nn.Sequential(
-            nn.Linear(cfg[-1]*3*3, 20),
-            nn.ReLU(inplace=True),
-            nn.Linear(20, out_classes)
+            nn.Conv2d(cfg[-2], out_channels=out_classes, kernel_size=3, padding=0, stride=1, bias=True)
+            #nn.Linear(cfg[-2]*3*3, out_classes)
         )
 
         self._initialize_weights_kaiming()
@@ -36,14 +36,15 @@ class SimpleCNN(nn.Module):
                 in_channels = v
         return nn.Sequential(*layers)
 
+
     def forward(self, x):
         x = self.feature(x)
-        x = nn.AvgPool2d(2)(x)
+        #x = nn.AvgPool2d(2)(x)
         #print("features:", x.size())
-        x = x.view(x.size(0), -1)
+        #x = x.view(x.size(0), -1)
         
         y = self.classifier(x)
-        #y = y.view(y.size(0),-1)
+        y = y.view(y.size(0),-1)
         return y
 
 

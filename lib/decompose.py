@@ -286,7 +286,6 @@ class Decompose:
 
 
     def get_decompose_weight(self):
-
         # scale matrix
         z = None
 
@@ -297,11 +296,61 @@ class Decompose:
         layer_id = -1
 
         for index, layer in enumerate(self.param_dict):
-
             original = self.param_dict[layer]
+            # SimpleCNN
+            if self.arch == 'SimpleCNN':
+                import sys # DEBUG
+                #feature
+                if 'feature' in layer:
+                    # conv
+                    if len(self.param_dict[layer].shape) == 4:
+                        # increase layer id
+                        layer_id += 1 
+                        # get most 'important' filter indices
+                        self.output_channel_index[index] = self.get_output_channel_index(self.param_dict[layer], layer_id)
+                        # Merge previous scale matrix z (if any available)
+                        if z != None:
+                            original = original[:,input_channel_index,:,:]
+                            for i, f in enumerate(self.param_dict[layer]):
+                                o = f.view(f.shape[0],-1)
+                                o = torch.mm(z,o)
+                                o = o.view(z.shape[0], f.shape[1], f.shape[2])
+                                original[i,:,:,:] = o
+                        
+                        z_temp = create_scaling_mat_conv_thres(self.param_dict[layer].cpu().detach().numpy(), 
+                                    np.array(self.output_channel_index[index]), self.threshold, self.model_type)
 
+                        z = torch.from_numpy(z_temp).type(dtype=torch.float)
+                        if self.cuda:
+                            z = z.cuda()
+                        z = z.t()
+
+                        # pruned
+                        pruned = original[self.output_channel_index[index],:,:,:]
+                        # update next input channel
+                        input_channel_index = self.output_channel_index[index]
+                        # update decompose weight
+                        self.decompose_weight[index] = pruned
+
+                if 'classifier' in layer: # This is the final layer
+                    # conv
+                    if len(self.param_dict[layer].shape) == 4:
+                        # Because I am assuming a single layer I only need to apply z
+                        if z != None:
+                            original = original[:,input_channel_index,:,:]
+                            for i, f in enumerate(self.param_dict[layer]):
+                                o = f.view(f.shape[0],-1)
+                                o = torch.mm(z,o)
+                                o = o.view(z.shape[0], f.shape[1], f.shape[2])
+                                original[i,:,:,:] = o
+                        else:
+                            assert(True, "Scale matrix z is empty on classifier, something went horribly wrong!")
+                        # Add to list of decomposed weights
+                        self.decompose_weight[index] = original
+                    break
+                    
             # VGG
-            if self.arch == 'VGG' or self.arch == 'SimpleCNN':
+            if self.arch == 'VGG':
                 # feature
                 if 'feature' in layer: 
                     # conv
@@ -352,10 +401,7 @@ class Decompose:
 
                 # first classifier
                 else:
-                    print(z.shape)
                     pruned = torch.zeros(original.shape[0],z.shape[0])
-                    print("original", original.shape)
-                    print("pruned", pruned.shape)
                     if self.cuda:
                         pruned = pruned.cuda()
 

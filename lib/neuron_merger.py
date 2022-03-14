@@ -64,7 +64,7 @@ class NeuronMerger():
         if(self.args.cuda):
             expanded_model.cuda()
         # Copy model weights 
-        self.copy_weights_and_init(model, expanded_model)
+        self.copy_weights(model, expanded_model)
         return expanded_model
 
 

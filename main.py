@@ -156,7 +156,7 @@ if __name__=='__main__':
     if not (args.target in [None, 'conv', 'ip']):
         print('ERROR: Please choose the correct decompose target')
         exit()
-    if not (args.arch in ['VGG','ResNet','WideResNet','LeNet_300_100']):
+    if not (args.arch in ['VGG','ResNet','WideResNet','LeNet_300_100', 'SimpleCNN']):
         print('ERROR: specified arch is not suppported')
         exit()
     
@@ -225,6 +225,17 @@ if __name__=='__main__':
 
         num_classes = 10
 
+    elif args.dataset == 'MNIST':
+        transform = transforms.Compose([ transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,)) ])
+        train_data = datasets.MNIST('data', train=True, download=True, transform=transform)
+        test_data = datasets.MNIST('data', train=False, download=True, transform=transform)
+
+        kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
+        train_loader = torch.utils.data.DataLoader(train_data, batch_size=args.batch_size, shuffle=True, **kwargs)
+        test_loader = torch.utils.data.DataLoader(test_data, batch_size=args.test_batch_size, shuffle=False, **kwargs)
+
+        num_classes = 10
+
     else : 
         pass
 
@@ -237,6 +248,14 @@ if __name__=='__main__':
     # make cfg
     if args.retrain:
         if args.target == 'conv' :
+            if args.arch == 'SimpleCNN':
+                cfg = [8, "M", 16, "M", 32]
+                for i in range(len(cfg)):
+                    if(type(cfg[i]) == int):
+                        cfg[i] = int(cfg[i] * (1 - args.pruning_ratio)) 
+                temp_cfg = list(filter(('M').__ne__, cfg))
+                print("SimpleCNN cfg: ", temp_cfg)
+
             if args.arch == 'VGG':
                 if args.dataset == 'cifar10':
                     #cfg = [32, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 256, 256, 256, 'M', 256, 256, 256]
@@ -275,7 +294,7 @@ if __name__=='__main__':
 
     # generate the model
     model = models.generate_model(args.arch, cfg, num_classes, args)
-    
+    print(model)
     if args.cuda:
         model.cuda()
 
@@ -312,7 +331,7 @@ if __name__=='__main__':
         test(0, evaluate=True)
         exit()
 
-
+    """
     # DEBUG
     if(args.arch == "VGG"):
         neuronMerger = NeuronMerger(expand_percentage=0.2, args=args)
@@ -328,7 +347,7 @@ if __name__=='__main__':
     print("done...")
     sys.exit()
     # END DEBUG
-
+    """
     for epoch in range(1, args.epochs + 1):
         adjust_learning_rate(optimizer, epoch, args.gammas, args.schedule)
         train(epoch)

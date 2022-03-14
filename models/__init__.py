@@ -1,7 +1,8 @@
 from .LeNet_300_100     import *
-from .VGG       import *
+from .VGG               import *
 from .ResNet    		import *
 from .WideResNet		import *
+from .SimpleCNN         import *
 
 import copy
 
@@ -15,6 +16,8 @@ def generate_model(arch_name:str, cfg, num_classes, args):
         model = ResNet(int(args.depth_wide) ,num_classes,cfg=cfg)
     elif args.arch == 'WideResNet':
         model = WideResNet(args.depth_wide[0], num_classes, widen_factor=args.depth_wide[1], cfg=cfg)
+    elif args.arch == 'SimpleCNN':
+        model = SimpleCNN(num_classes, cfg=cfg)
     else:
         pass
     

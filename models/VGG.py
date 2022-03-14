@@ -19,27 +19,30 @@ defaultcfg = {
 
 
 class VGG(nn.Module):
-    def __init__(self, out_classes=10, depth=11, init_weights=True, cfg=None):
+    def __init__(self, out_classes=10, depth=11, init_weights=True, cfg=None, bn=True):
         super(VGG, self).__init__()
         if cfg is None:
             cfg = defaultcfg[depth]
 
+        self.bn = bn
         self.cfg = cfg
 
-        #self.feature = self.make_layers(cfg, True)
-        self.feature = self.make_layers(cfg, False)
-
+        self.feature = self.make_layers(cfg)
+        
         self.classifier = nn.Sequential(
             nn.Linear(cfg[-1], 512),
             nn.BatchNorm1d(512),
             nn.ReLU(inplace=True),
             nn.Linear(512, out_classes)
         )
-        if init_weights:
-            self._initialize_weights()
+
+        self._initialize_weights_kaiming()
+
+        #if init_weights:
+        #    self._initialize_weights() # I don't know what this is?
         
 
-    def make_layers(self, cfg, batch_norm=False):
+    def make_layers(self, cfg):
         layers = []
         in_channels = 3
         for v in cfg:
@@ -47,7 +50,7 @@ class VGG(nn.Module):
                 layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
             else:
                 conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1, bias=False)
-                if batch_norm:
+                if self.bn:
                     layers += [conv2d, nn.BatchNorm2d(v), nn.ReLU(inplace=True)]
                 else:
                     layers += [conv2d, nn.ReLU(inplace=True)]
@@ -55,7 +58,6 @@ class VGG(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-
         x = self.feature(x)
         x = nn.AvgPool2d(2)(x)
         x = x.view(x.size(0), -1)
@@ -75,41 +77,35 @@ class VGG(nn.Module):
             elif isinstance(m, nn.Linear):
                 m.weight.data.normal_(0, 0.01)
                 m.bias.data.zero_()
+
+    def _initialize_weights_kaiming(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight)
+                if m.bias is not None:
+                    m.bias.data.zero_()
+            elif isinstance(m, nn.BatchNorm2d):
+                m.weight.data.fill_(1.0)
+                m.bias.data.zero_()
+
     
     def extract_feature(self, x, preReLU=False):
-
         x = x.cuda()
-
         feat1 = self.feature(x)
-
         if not preReLU:
             feat1 = F.relu(feat1)
-
         return [feat1]
 
     def bn_feature(self,x):
-
         bn_feature = []
-
         for layer in self.feature:
             x = layer(x)
-
             if isinstance(layer, nn.BatchNorm2d) :
                 # temp = torch.sum(x,0).cpu().detach().numpy()
                 temp = x.cpu().detach().numpy()
                 bn_feature.append(temp)
         
         return bn_feature
-
-
-    def ware(self, x):
-
-        x = self.feature(x)
-        x = nn.AvgPool2d(2)(x)
-        x = x.view(x.size(0), -1)
-        y = self.classifier(x)
-
-        return y.cpu().detach().numpy()
 
     def get_cfg(self):
         return self.cfg

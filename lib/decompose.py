@@ -301,9 +301,9 @@ class Decompose:
             original = self.param_dict[layer]
 
             # VGG
-            if self.arch == 'VGG':
+            if self.arch == 'VGG' or self.arch == 'SimpleCNN':
                 # feature
-                if 'feature' in layer : 
+                if 'feature' in layer: 
                     # conv
                     if len(self.param_dict[layer].shape) == 4:
                         layer_id += 1
@@ -318,17 +318,16 @@ class Decompose:
                                 o = o.view(z.shape[0],f.shape[1],f.shape[2])
                                 original[i,:,:,:] = o
 
-                        # make scale matrix with batchNorm
-                        bn = list(self.param_dict.values())
-
-                        bn_weight = bn[index+1].cpu().detach().numpy()
-                        bn_bias = bn[index+2].cpu().detach().numpy()
-                        bn_mean = bn[index+3].cpu().detach().numpy()
-                        bn_var = bn[index+4].cpu().detach().numpy()
-
                         if(self.no_bn):
                             x = create_scaling_mat_conv_thres(self.param_dict[layer].cpu().detach().numpy(), np.array(self.output_channel_index[index]), self.threshold, self.model_type)
                         else:
+                            # make scale matrix with batchNorm
+                            bn = list(self.param_dict.values())
+
+                            bn_weight = bn[index+1].cpu().detach().numpy()
+                            bn_bias = bn[index+2].cpu().detach().numpy()
+                            bn_mean = bn[index+3].cpu().detach().numpy()
+                            bn_var = bn[index+4].cpu().detach().numpy()
                             x = create_scaling_mat_conv_thres_bn(self.param_dict[layer].cpu().detach().numpy(), np.array(self.output_channel_index[index]), self.threshold, 
                                                                                 bn_weight, bn_bias, bn_mean, bn_var, self.lamda, self.model_type)
 
@@ -353,8 +352,10 @@ class Decompose:
 
                 # first classifier
                 else:
+                    print(z.shape)
                     pruned = torch.zeros(original.shape[0],z.shape[0])
-
+                    print("original", original.shape)
+                    print("pruned", pruned.shape)
                     if self.cuda:
                         pruned = pruned.cuda()
 

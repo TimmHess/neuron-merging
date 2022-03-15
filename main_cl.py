@@ -14,6 +14,8 @@ import numpy as np
 import cv2
 import os
 import sys
+from tqdm import tqdm
+
 
 cwd = os.getcwd()
 sys.path.append(cwd+'/../')
@@ -63,7 +65,7 @@ def test(epoch, test_loader):
     test_loss = 0
     correct = 0
     with torch.no_grad():
-        for batch_idx, batch in enumerate(test_loader):
+        for batch_idx, batch in tqdm(enumerate(test_loader)):
             data, target, _ = batch
             if args.cuda:
                 data, target = data.cuda(), target.cuda()
@@ -122,7 +124,7 @@ criterion = nn.CrossEntropyLoss()
 transform = transforms.Compose([transforms.ToTensor()])
 scenario = EndlessCLSim(
     scenario="Illumination",
-    sequence_order=[0],
+    sequence_order=args.seq_order,
     task_order=None,
     dataset_root="./data/",
     train_transform=transform,
@@ -133,12 +135,22 @@ test_stream = scenario.test_stream
 kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
 
 print("Train stream:", len(train_stream))
+print("Val stream:", len(test_stream))
 
+if args.evaluate and not args.retrain:
+    print("Evaluation only...")
+    # Test Loop
+    for j, test_exp in enumerate(test_stream):
+        test_set, t = test_exp.dataset, test_exp.task_label
+        test_loader = DataLoader(test_set, batch_size=32, shuffle=False)
+        test(0, test_loader)
+    sys.exit()
 
 for i, exp in enumerate(train_stream):
     dataset, t = exp.dataset, exp.task_label
     train_loader = DataLoader(dataset, batch_size=32, shuffle=True, **kwargs)
     
+    # Train Loop
     for epoch in range (args.epochs):
         train_one_epoch(epoch, train_loader)
 
@@ -146,5 +158,10 @@ for i, exp in enumerate(train_stream):
     if not args.retrain:
         models.save_state(model, -1.0, args)
 
-# Test Loop
+    # Test Loop
+    for j, test_exp in enumerate(test_stream):
+        test_set, t = test_exp.dataset, test_exp.task_label
+        test_loader = DataLoader(test_set, batch_size=32, shuffle=False)
+        test(0, test_loader)
+
 

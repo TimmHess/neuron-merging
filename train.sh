@@ -21,7 +21,7 @@
 
 ##########################################
 # PreTrain SimpleCNN 
-python3 main_cl.py --arch SimpleCNN --dataset DecrasingLighting --batch-size 32 --epochs 10 --model-type original --pruning-ratio 0.0 --lr 0.001 --log-interval 200 --num_classes 5
+#python3 main_cl.py --arch SimpleCNN --dataset DecrasingLighting2 --batch-size 32 --epochs 10 --model-type original --pruning-ratio 0.0 --lr 0.001 --log-interval 200 --num_classes 5 --seq_order 4
 
-# 
-python3 main_cl.py --arch SimpleCNN --dataset DecrasingLighting --batch-size 32 --epochs 10 --model-type original --pruning-ratio 0.0 --lr 0.001 --log-interval 200 --num_classes 5
+# CL Tests
+python3 main_cl.py --arch SimpleCNN --dataset DecrasingLighting --batch-size 32 --epochs 5 --model-type original --pruning-ratio 0.0 --lr 0.001 --log-interval 200 --num_classes 5 --evaluate --pretrained saved_models/SimpleCNN.DecrasingLighting2.original.pth.tar --seq_order 0 1 2 3 4

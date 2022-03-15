@@ -53,3 +53,7 @@ parser.add_argument('--depth-wide', action='store', default=None,
         help='depth and wide (default: None)')
 parser.add_argument('--no_bn', action='store_true', default=False,
         help='drops batch-norm term in neuron merging function') # TODO: make this agnistic to whether ther actually is a batch-norm term
+
+
+parser.add_argument('--seq_order', type=int, nargs='+', default=[0,1,2,3,4],
+        help='indices of subsequent sequences')
